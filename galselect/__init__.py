@@ -1,2 +1,2 @@
-from .select import DataMatcher
-from .plots import Plotter, RedshiftStats
+from .data import MatchingCatalogue
+from .matching import GalaxyMatcher
