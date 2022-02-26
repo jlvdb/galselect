@@ -21,14 +21,14 @@ class MatchingCatalogue:
     ) -> None:
         self.data = dataframe
         # check the redshift data
-        if redshift not in dataframe:
-            raise KeyError(f"redshift column '{redshift}' does not exist")
-        else:
-            self._redshift = redshift
+        self._check_column(redshift)
+        self._redshift = redshift
         # check the feature data
+        if len(feature_names) == 0:
+            raise ValueError("no features provided")
         self._feature_names = []
         for col in feature_names:
-            self._check_feature_column(col)
+            self._check_column(col)
             self._feature_names.append(col)
         # check the optional weights
         if feature_weights is None:
@@ -38,15 +38,15 @@ class MatchingCatalogue:
         else:
             self._weights = feature_weights
 
-    def _check_feature_column(
+    def _check_column(
         self,
         colname: str
     ) -> None:
         if colname not in self.data:
-            raise KeyError(f"feature column '{colname}' does not exist")
+            raise KeyError(f"column '{colname}' does not exist")
         if not np.issubdtype(self.data[colname], np.number):
             raise TypeError(
-                f"type of feature column '{colname}' is not numeric")
+                f"type of column '{colname}' is not numeric")
 
     def __len__(self) -> int:
         return len(self.data)
