@@ -10,7 +10,7 @@ from .data import MCType
 
 def sort_with_argsort(data: npt.ArrayLike) -> Tuple[npt.NDArray, npt.NDArray]:
     sort_index = np.argsort(data)
-    sorted_data = data[sort_index]
+    sorted_data = np.asarray(data)[sort_index]
     return sort_index, sorted_data
 
 
@@ -18,11 +18,13 @@ def compute_thread_index_range(
     index_ranges: npt.NDArray,
     threads: int
 ) -> npt.NDArray:
+    index_ranges = np.asarray(index_ranges)
     # check the number of threads if there are too few objects
     if threads is None:
         threads = multiprocessing.cpu_count()
-    n_mock = len(index_ranges)
-    if n_mock < threads:
+    if threads < 1:
+        raise ValueError("requires threads>1")
+    if (n_mock := len(index_ranges)) < threads:
         threads = n_mock
     # Distribute the mock index ranges over the thread. Since mock and data
     # are both sorted by redshift the index ranges are increasing
@@ -30,7 +32,7 @@ def compute_thread_index_range(
     splits = np.linspace(0, n_mock, threads + 1).astype(np.int_)
     thread_ranges = np.empty_like(index_ranges, shape=(threads, 2))
     for i, (start, end) in enumerate(zip(splits[:-1], splits[1:])):
-        thread_ranges[i] = (index_ranges[start, 0], index_ranges[end, 1])
+        thread_ranges[i] = (index_ranges[start, 0], index_ranges[end - 1, 1])
     return thread_ranges
 
 
@@ -43,7 +45,7 @@ def euclidean_distance(
     return dist
 
 
-class GalaxyMatcher:
+class GalaxyMatcher(object):
 
     def __init__(
         self,
@@ -73,7 +75,7 @@ class GalaxyMatcher:
         idx_lo = idx - d_idx // 2
         idx_hi = idx_lo + d_idx
         # clip array limits
-        idx_range = np.empty_like(idx_lo, shape=(len(redshift), 2))
+        idx_range = np.empty_like(idx, shape=(len(redshift), 2))
         idx_range[:, 0] = np.maximum(idx_lo, 0)
         idx_range[:, 1] = np.minimum(idx_hi, len(self._sorted_redshifts) - 1)
         return idx_range

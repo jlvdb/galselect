@@ -75,7 +75,7 @@ def make_figure(nrows, ncols, size=2.5):
     return fig, axes
 
 
-class BasePlotter:
+class BasePlotter(object):
 
     def __init__(self, fpath):
         self.fpath = fpath
@@ -235,7 +235,7 @@ class Plotter(BasePlotter):
         self.add_fig(g.figure)
 
 
-class Catalogue:
+class Catalogue(object):
 
     def __init__(
             self, name, fpath, specname, photname, *features, fields=None):

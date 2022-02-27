@@ -13,7 +13,7 @@ SharedArrayMeta = collections.namedtuple(
     "SharedArrayMeta", ["buffer", "dtype", "shape"])
 
 
-class SharedArrayHelper:
+class SharedArrayHelper(object):
 
     def __init__(
         self,
