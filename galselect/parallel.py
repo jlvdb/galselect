@@ -32,7 +32,6 @@ class SharedArrayHelper:
 
     @property
     def size(self) -> int:
-        print()
         return self._data.size
 
     @property
