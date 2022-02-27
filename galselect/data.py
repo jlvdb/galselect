@@ -10,6 +10,10 @@ MCType = TypeVar("MCType", bound="MatchingCatalogue")
 NormaliseType = Union[bool, MCType]
 
 
+class FeaturesIncompatibleError(Exception):
+    pass
+
+
 class MatchingCatalogue:
 
     def __init__(
@@ -25,15 +29,15 @@ class MatchingCatalogue:
         self._redshift = redshift
         # check the feature data
         if len(feature_names) == 0:
-            raise ValueError("no features provided")
+            raise ValueError("empty list of features provided")
         self._feature_names = []
         for col in feature_names:
             self._check_column(col)
             self._feature_names.append(col)
         # check the optional weights
         if feature_weights is None:
-            self._weights = np.ones(self.n_features())
-        elif len(feature_weights) != self.n_features():
+            self._weights = np.ones(len(feature_names))
+        elif len(feature_weights) != len(feature_names):
             raise ValueError("number of features and weights does not match")
         else:
             self._weights = feature_weights
@@ -42,8 +46,6 @@ class MatchingCatalogue:
         self,
         colname: str
     ) -> None:
-        if colname not in self.data:
-            raise KeyError(f"column '{colname}' does not exist")
         if not np.issubdtype(self.data[colname], np.number):
             raise TypeError(
                 f"type of column '{colname}' is not numeric")
@@ -53,6 +55,12 @@ class MatchingCatalogue:
 
     def n_features(self) -> int:
         return len(self._feature_names)
+
+    def compatible(
+        self,
+        other: MCType
+    ) -> bool:
+        return self.n_features() == other.n_features()
 
     def _compute_norm(self) -> Tuple[npt.NDArray, npt.NDArray]:
         offset = np.median(self.features, axis=0)
@@ -78,6 +86,8 @@ class MatchingCatalogue:
             if normalise is True:
                 offset, scale = self._compute_norm()
             elif type(normalise) is type(self):
+                if not self.compatible(normalise):
+                    raise FeaturesIncompatibleError
                 offset, scale = normalise._compute_norm()
             else:
                 raise TypeError(f"invalid normalisation '{type(normalise)}'")
