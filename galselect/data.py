@@ -14,7 +14,7 @@ class FeaturesIncompatibleError(Exception):
     pass
 
 
-class MatchingCatalogue:
+class MatchingCatalogue(object):
 
     def __init__(
         self,
@@ -80,7 +80,7 @@ class MatchingCatalogue:
         normalise: Optional[NormaliseType] = None
     ) -> npt.NDArray:
         features = self.features
-        if normalise is None:
+        if normalise is None or normalise is False:
             return features
         if normalise is not None:
             if normalise is True:

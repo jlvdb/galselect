@@ -112,6 +112,7 @@ class MatchingCatalogueInternalTest(MatchingCatalogueTest):
         for n_features, mc in self.mcs.items():
             with self.subTest(n_features=n_features):
                 npt.assert_array_equal(mc.features, mc.get_features())
+                npt.assert_array_equal(mc.features, mc.get_features(False))
 
     def test_get_features_normed(self):
         for n_features, mc in self.mcs.items():
