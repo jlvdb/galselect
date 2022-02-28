@@ -63,8 +63,9 @@ class MatchingCatalogue(object):
         return self.n_features() == other.n_features()
 
     def _compute_norm(self) -> Tuple[npt.NDArray, npt.NDArray]:
-        offset = np.median(self.features, axis=0)
-        scale = scipy.stats.median_abs_deviation(self.features, axis=0)
+        features = self.features
+        offset = np.median(features, axis=0)
+        scale = scipy.stats.median_abs_deviation(features, axis=0)
         return offset, scale
 
     @property
@@ -73,7 +74,9 @@ class MatchingCatalogue(object):
 
     @property
     def features(self) -> npt.NDArray:
-        return np.column_stack([self.data[col] for col in self._feature_names])
+        features = np.column_stack([
+            self.data[col] for col in self._feature_names])
+        return features * self._weights
 
     def get_features(
         self,
