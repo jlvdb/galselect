@@ -187,3 +187,8 @@ def test_get_features_normed_external_invalid_type(mock_catalogue):
     catalogue = mock_catalogue()
     with pytest.raises(TypeError):
         catalogue.get_features("invalid input")
+
+
+@pytest.mark.xfail
+def test_apply_mask(mock_catalogue):
+    assert False

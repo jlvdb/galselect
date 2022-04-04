@@ -95,3 +95,14 @@ class MatchingCatalogue(object):
             else:
                 raise TypeError(f"invalid normalisation '{type(normalise)}'")
             return (features - offset) / scale
+
+    def apply_mask(
+        self,
+        mask: npt.NDArray
+    ) -> MCType:
+        masked = MatchingCatalogue(
+            self.data[mask],
+            redshift=self._redshift,
+            feature_names=self._feature_names,
+            feature_weights=self._weights)
+        return masked
