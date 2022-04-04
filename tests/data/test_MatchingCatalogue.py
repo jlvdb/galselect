@@ -10,13 +10,17 @@ from galselect.data import FeaturesIncompatibleError
 
 class MockData:
 
-    def __init__(self, n_features):
+    def __init__(self, n_features, weighted=False):
         self.n_features = n_features
         self.redshifts = np.array([0.5, 0.1, 0.2, 0.3, 0.8])
         self.features = [
             np.array([3,     4, 123,  24,  52]),
             np.array([2.5, 3.0, 4.0, 2.0, 3.2])][:n_features]
         self.names = [f"feature{n+1}" for n in range(n_features)]
+        if weighted:
+            self.weights = 2.0 + np.arange(n_features)
+        else:
+            self.weights = np.ones(n_features)
         self.median = np.median(self.features, axis=1)
         self.nmad = scipy.stats.median_abs_deviation(self.features, axis=1)
     
@@ -31,17 +35,20 @@ class MockData:
 
 @pytest.fixture
 def mock_data():
-    def make_mock_data(n_features=2):
-        return MockData(n_features)
+    def make_mock_data(n_features=2, weighted=False):
+        return MockData(n_features, weighted)
     return make_mock_data
 
 
 @pytest.fixture
 def mock_catalogue(mock_data):
-    def make_mock_catalogue(n_features=2, weight=1.0):
-        data = mock_data(n_features)
+    def make_mock_catalogue(n_features=2, weighted=False):
+        data = mock_data(n_features, weighted)
+        kwargs = {}
+        if weighted:
+            kwargs["feature_weights"] = data.weights
         return MatchingCatalogue(
-            data.dataframe, "redshift", data.names, [weight]*n_features)
+            data.dataframe, "redshift", data.names, **kwargs)
     return make_mock_catalogue
 
 
@@ -57,10 +64,19 @@ def test_no_features_error(mock_data):
 
 
 @pytest.mark.parametrize("n_features", [1, 2])
+def test_weight(mock_data, n_features):
+    data = mock_data(n_features, weighted=True)
+    catalogue = MatchingCatalogue(
+        data.dataframe, "redshift", data.names, data.weights)
+    npt.assert_array_equal(catalogue._weights, data.weights)
+
+
+@pytest.mark.parametrize("n_features", [1, 2])
 def test_weight_default_value(mock_data, n_features):
     data = mock_data(n_features)
     catalogue = MatchingCatalogue(data.dataframe, "redshift", data.names)
     npt.assert_array_equal(catalogue._weights, np.ones(n_features))
+
 
 @pytest.mark.parametrize("n_weights", [1, 3])
 def test_weight_shape_mismatch(mock_data, n_weights):
@@ -69,6 +85,7 @@ def test_weight_shape_mismatch(mock_data, n_weights):
         MatchingCatalogue(
             data.dataframe, "redshift", data.names,
             feature_weights=[2.0] * n_weights)
+
 
 def test_check_redshit_not_numeric(mock_data):
     data = mock_data()
@@ -101,42 +118,44 @@ def test_redshift(mock_data, mock_catalogue):
     catalogue = mock_catalogue()
     npt.assert_array_equal(catalogue.redshift, data.dataframe["redshift"])
 
+
 @pytest.mark.parametrize("n_features", [1, 2])
-def test_features(mock_data, mock_catalogue, n_features):
-    data = mock_data(n_features)
-    catalogue = mock_catalogue(n_features)
+@pytest.mark.parametrize("weighted", [False, True])
+def test_features(mock_data, mock_catalogue, n_features, weighted):
+    data = mock_data(n_features, weighted)
+    catalogue = mock_catalogue(n_features, weighted)
     npt.assert_array_equal(
         catalogue.features, np.column_stack(data.features))
 
-@pytest.mark.parametrize("n_features", [1, 2])
-def test_features_weighted(mock_data, mock_catalogue, n_features):
-    weight = 2.0
-    data = mock_data(n_features)
-    catalogue = mock_catalogue(n_features, weight)
-    npt.assert_array_equal(
-        catalogue.features, np.column_stack(weight*np.array(data.features)))
 
 @pytest.mark.parametrize("n_features", [1, 2])
-def test_compute_norm_weighted(mock_data, mock_catalogue, n_features):
-    weight = 2.0
-    data = mock_data(n_features)
-    catalogue = mock_catalogue(n_features, weight)
+@pytest.mark.parametrize("weighted", [False, True])
+def test_compute_norm(mock_data, mock_catalogue, n_features, weighted):
+    data = mock_data(n_features, weighted)
+    catalogue = mock_catalogue(n_features, weighted)
     offset, scale = catalogue._compute_norm()
-    npt.assert_array_equal(offset, weight * data.median)
-    npt.assert_array_equal(scale, weight * data.nmad)
+    npt.assert_array_equal(offset, data.median)
+    npt.assert_array_equal(scale, data.nmad)
 
 
 @pytest.mark.parametrize("n_features", [1, 2])
-def test_get_features(mock_catalogue, n_features):
-    catalogue = mock_catalogue(n_features)
-    npt.assert_array_equal(catalogue.features, catalogue.get_features())
-    npt.assert_array_equal(catalogue.features, catalogue.get_features(False))
+@pytest.mark.parametrize("weighted", [False, True])
+def test_get_features(mock_data, mock_catalogue, n_features, weighted):
+    data = mock_data(n_features, weighted)
+    catalogue = mock_catalogue(n_features, weighted)
+    npt.assert_array_equal(
+        catalogue.features * data.weights,
+        catalogue.get_features())
+    npt.assert_array_equal(
+        catalogue.features * data.weights,
+        catalogue.get_features(False))
 
 
 @pytest.mark.parametrize("n_features", [1, 2])
-def test_get_features_normed(mock_data, mock_catalogue, n_features):
-    data = mock_data(n_features)
-    catalogue = mock_catalogue(n_features)
+@pytest.mark.parametrize("weighted", [False, True])
+def test_get_features_normed(mock_data, mock_catalogue, n_features, weighted):
+    data = mock_data(n_features, weighted)
+    catalogue = mock_catalogue(n_features, weighted)
     features = catalogue.get_features(True)
     # create a new catalogue from the obtined weights
     data.features = [feature for feature in features.T]
@@ -145,7 +164,7 @@ def test_get_features_normed(mock_data, mock_catalogue, n_features):
     normed_offset, normed_scale = normed_catalogue._compute_norm()
     # compare to normalisation parameters expected from normalised features
     npt.assert_array_equal(normed_offset, np.zeros(n_features))
-    npt.assert_array_equal(normed_scale, np.ones(n_features))
+    npt.assert_array_equal(normed_scale, data.weights)
 
 
 @pytest.mark.parametrize("n_features", [1, 2])
@@ -161,9 +180,11 @@ def test_not_compatible(mock_catalogue):
 
 
 @pytest.mark.parametrize("n_features", [1, 2])
-def test_get_features_normed_external(mock_data, mock_catalogue, n_features):
-    data = mock_data(n_features)
-    catalogue = mock_catalogue(n_features)
+@pytest.mark.parametrize("weighted", [False, True])
+def test_get_features_normed_external(
+        mock_data, mock_catalogue, n_features, weighted):
+    data = mock_data(n_features, weighted)
+    catalogue = mock_catalogue(n_features, weighted)
     # normalise with the instance of itself
     features = catalogue.get_features(catalogue)
     # create a new catalogue from the obtined weights
@@ -173,7 +194,7 @@ def test_get_features_normed_external(mock_data, mock_catalogue, n_features):
     normed_offset, normed_scale = normed_catalogue._compute_norm()
     # compare to normalisation parameters expected from normalised features
     npt.assert_array_equal(normed_offset, np.zeros(n_features))
-    npt.assert_array_equal(normed_scale, np.ones(n_features))
+    npt.assert_array_equal(normed_scale, data.weights)
 
 
 def test_get_features_normed_external_incompatible(mock_catalogue):
@@ -189,6 +210,13 @@ def test_get_features_normed_external_invalid_type(mock_catalogue):
         catalogue.get_features("invalid input")
 
 
-@pytest.mark.xfail
-def test_apply_mask(mock_catalogue):
-    assert False
+def test_apply_mask(mock_data, mock_catalogue):
+    data = mock_data(weighted=True)
+    catalogue = mock_catalogue(weighted=True)
+    mask = np.ones(len(catalogue), dtype="bool")
+    mask[0] = False
+    masked = catalogue.apply_mask(mask)
+    npt.assert_array_equal(masked.redshift, catalogue.redshift[mask])
+    npt.assert_array_equal(masked.features, catalogue.features[mask])
+    # previous statements effectively test _redshift and _feature_names
+    npt.assert_array_equal(catalogue._weights, masked._weights)
