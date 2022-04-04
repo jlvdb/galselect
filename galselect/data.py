@@ -25,14 +25,14 @@ class MatchingCatalogue(object):
     ) -> None:
         self.data = dataframe
         # check the redshift data
-        self._check_column(redshift)
+        self._check_column_numeric(redshift)
         self._redshift = redshift
         # check the feature data
         if len(feature_names) == 0:
             raise ValueError("empty list of features provided")
         self._feature_names = []
         for col in feature_names:
-            self._check_column(col)
+            self._check_column_numeric(col)
             self._feature_names.append(col)
         # check the optional weights
         if feature_weights is None:
@@ -42,7 +42,7 @@ class MatchingCatalogue(object):
         else:
             self._weights = feature_weights
 
-    def _check_column(
+    def _check_column_numeric(
         self,
         colname: str
     ) -> None:
@@ -76,7 +76,7 @@ class MatchingCatalogue(object):
     def features(self) -> npt.NDArray:
         features = np.column_stack([
             self.data[col] for col in self._feature_names])
-        return features * self._weights
+        return features
 
     def get_features(
         self,
@@ -84,8 +84,8 @@ class MatchingCatalogue(object):
     ) -> npt.NDArray:
         features = self.features
         if normalise is None or normalise is False:
-            return features
-        if normalise is not None:
+            return features * self._weights
+        else:
             if normalise is True:
                 offset, scale = self._compute_norm()
             elif type(normalise) is type(self):
@@ -94,15 +94,16 @@ class MatchingCatalogue(object):
                 offset, scale = normalise._compute_norm()
             else:
                 raise TypeError(f"invalid normalisation '{type(normalise)}'")
-            return (features - offset) / scale
+            return (features - offset) / scale * self._weights
 
     def apply_mask(
         self,
         mask: npt.NDArray
     ) -> MCType:
-        masked = MatchingCatalogue(
-            self.data[mask],
-            redshift=self._redshift,
-            feature_names=self._feature_names,
-            feature_weights=self._weights)
+        masked = self.__class__.__new__(self.__class__)
+        # set new data with mask applied
+        masked.data = self.data[mask]
+        # copy static attributes
+        for attr in ("_redshift", "_feature_names", "_weights"):
+            setattr(masked, attr, getattr(self, attr))
         return masked
