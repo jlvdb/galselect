@@ -345,6 +345,17 @@ class MatchingCatalogue(object):
             return (features - offset) / scale
 
 
+class Distribution:
+
+    def __init__(self, data, label=None, samples=100):
+        self.quantiles = np.linspace(0.0, 1.0, samples + 1)
+        self.values = np.quantile(data, q=self.quantiles)
+        self.label = label
+
+    def cdf(self):
+        pass
+
+
 class Quantiles:
 
     q = np.linspace(0.0, 1.0, 101)
